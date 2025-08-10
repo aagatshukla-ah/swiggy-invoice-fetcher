@@ -1,14 +1,20 @@
-# Swiggy Invoice Fetcher
+# Swiggy Invoice Fetcher (Interactive Version)
 
-This script fetches Swiggy invoice emails via IMAP, filters by EarnIn address and date, downloads invoice PDFs, and merges them into a single file.
+This script fetches Swiggy invoice emails via IMAP, filters by EarnIn office address and date, downloads invoice PDFs, and merges them into a single file — all via **interactive terminal prompts**.
+
+---
 
 ## 🛠 Requirements
 
 - Python 3.7+
-- Enable IMAP in Gmail
-- Use App Passwords if using Gmail with 2FA
+- IMAP enabled in Gmail
+- App Password (not your Gmail password)
+
+---
 
 ## 🔧 Setup
+
+Install required libraries:
 
 ```bash
 pip install -r requirements.txt
@@ -22,11 +28,10 @@ To allow this script to access your Gmail inbox, complete the following steps:
 
 #### ✅ Step 1: Enable 2-Step Verification
 
-Enable 2FA so you can create an App Password.
-
 ```bash
 https://myaccount.google.com/security
 ```
+
 → Scroll to **"Signing in to Google"**  
 → Enable **2-Step Verification**
 
@@ -34,33 +39,41 @@ https://myaccount.google.com/security
 
 #### ✅ Step 2: Generate an App Password
 
-Create a one-time password to use securely in the script.
-
 ```bash
 https://myaccount.google.com/apppasswords
 ```
-→ Select **App: Mail**, **Device: Other** → name it `Swiggy Script`  
-→ Click **Generate** and **copy the 16-character password**
 
-Use this password in your `config.yaml` as the `PASSWORD` field (never use your main Gmail password).
+→ Select **App: Mail**, **Device: Other** → name it `Swiggy Script`  
+→ Click **Generate** and **copy the 16-character password**  
+→ You'll use this at runtime when prompted.
 
 ---
 
-## 📁 Configuration
-
-Edit the `config.yaml` file:
-
-```yaml
-EMAIL: 'your-email@gmail.com'
-PASSWORD: 'your-app-password'
-START_DATE: '24-06-25'
-END_DATE: '16-07-25'
-```
-
 ## 🚀 Run
 
+Run the interactive script:
+
 ```bash
-python fetch_invoices.py
+python fetch_invoices_interactive.py
 ```
 
-PDFs will be saved in `./swiggy_invoices`, filtered PDFs in `./filtered_invoices`, and the merged PDF at the location you specify.
+You’ll be prompted to enter:
+- Your Gmail address
+- Your App Password (hidden input)
+- Start and end date (in `DD-MM-YY` format)
+- Output folder paths and merged PDF name
+
+---
+
+## 📦 Output
+
+- PDFs downloaded to the folder you specify
+- Valid invoices filtered by office address and date
+- Merged PDF file with total amount printed at the end
+
+---
+
+## 🔐 Security Tip
+
+Never share or commit your app password. It is safer than using your real password, but still sensitive.
+
