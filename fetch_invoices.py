@@ -3,35 +3,34 @@ import email
 from email import message_from_bytes
 import os
 import re
-import yaml
 from datetime import datetime, timedelta
 from PyPDF2 import PdfReader, PdfMerger
+import getpass
 
-# === LOAD CONFIGURATION ===
-with open("config.yaml", "r") as f:
-    config = yaml.safe_load(f)
+# === INTERACTIVE PROMPTS ===
+EMAIL = input("Enter your Gmail address: ")
+PASSWORD = getpass.getpass("Enter your Gmail App Password (input hidden): ")
+EARNIN_OFFICE_ADDRESS = input("Enter your office address to filter by [default: Earnin India Office]: ") or "Earnin India Office"
 
-EMAIL = config["EMAIL"]
-PASSWORD = config["PASSWORD"]
-IMAP_SERVER = config.get("IMAP_SERVER", "imap.gmail.com")
-EARNIN_OFFICE_ADDRESS = config["EARNIN_OFFICE_ADDRESS"]
-START_DATE_INPUT = config["START_DATE"]
-END_DATE_INPUT = config["END_DATE"]
-INVOICE_DIR = config["INVOICE_DIR"]
-FILTERED_DIR = config["FILTERED_DIR"]
-MERGED_PDF = config["MERGED_PDF"]
+START_DATE_INPUT = input("Enter start date (DD-MM-YY): ")
+END_DATE_INPUT = input("Enter end date (DD-MM-YY): ")
 
-# Convert DD-MM-YY to datetime
+INVOICE_DIR = input("Enter directory to store downloaded invoices [default: ./swiggy_invoices]: ") or "./swiggy_invoices"
+FILTERED_DIR = input("Enter directory to store filtered invoices [default: ./filtered_invoices]: ") or "./filtered_invoices"
+MERGED_PDF = input("Enter full path for merged PDF [default: ./swiggy_invoices_merged.pdf]: ") or "./swiggy_invoices_merged.pdf"
+
+IMAP_SERVER = 'imap.gmail.com'
+
+# Convert dates
 start_dt = datetime.strptime(START_DATE_INPUT, "%d-%m-%y")
 end_dt = datetime.strptime(END_DATE_INPUT, "%d-%m-%y") + timedelta(days=1)
-
-# Convert to IMAP format
 START_DATE_STR = start_dt.strftime("%d-%b-%Y")
 END_DATE_STR = end_dt.strftime("%d-%b-%Y")
 
 os.makedirs(INVOICE_DIR, exist_ok=True)
 os.makedirs(FILTERED_DIR, exist_ok=True)
 
+# === HELPERS ===
 def extract_invoice_date(text):
     match = re.search(r'Date of Invoice:\s*(\d{2}-\d{2}-\d{4})', text)
     if match:
@@ -41,7 +40,6 @@ def extract_invoice_date(text):
 def extract_total_from_pdf(pdf_path):
     total_amount = 0.0
     currency_pattern = re.compile(r'Invoice Total\s+([\d,]+\.\d{2})')
-
     try:
         reader = PdfReader(pdf_path)
         print(f"\n📄 Processing file: {pdf_path}")
@@ -53,17 +51,16 @@ def extract_total_from_pdf(pdf_path):
             for amt_str in matches:
                 amt_str_clean = amt_str.replace(",", "")
                 total_amount += float(amt_str_clean)
-
         print(f"\n💰 Estimated total amount across all invoices: ₹{total_amount:.2f}")
     except Exception as e:
         print(f"❌ Error reading PDF: {e}")
 
+# === MAIN LOGIC ===
 try:
     print("Connecting to IMAP server...")
     mail = imaplib.IMAP4_SSL(IMAP_SERVER)
     print("Logging in...")
     mail.login(EMAIL, PASSWORD)
-    print("Selecting inbox...")
     mail.select("INBOX")
 
     print(f"Searching for Swiggy emails from {START_DATE_STR} to {END_DATE_STR}...")
@@ -82,7 +79,6 @@ try:
             if part.get_content_type() == 'application/pdf' and part.get_filename():
                 filename = os.path.basename(part.get_filename())
                 filepath = os.path.join(INVOICE_DIR, filename)
-
                 with open(filepath, 'wb') as f:
                     f.write(part.get_payload(decode=True))
                 print(f"Downloaded: {filename}")
