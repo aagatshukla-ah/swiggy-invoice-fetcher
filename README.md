@@ -54,6 +54,8 @@ https://myaccount.google.com/apppasswords
 Run the interactive script:
 
 ```bash
+git clone git@github.com:aagatshukla-ah/swiggy-invoice-fetcher.git
+cd swiggy-invoice-fetcher 
 python3 -m venv test
 source test/bin/activate
 pip install -r requirements.txt
