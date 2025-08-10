@@ -54,6 +54,9 @@ https://myaccount.google.com/apppasswords
 Run the interactive script:
 
 ```bash
+python3 -m venv test
+source test/bin/activate
+pip install -r requirements.txt
 python fetch_invoices_interactive.py
 ```
 
