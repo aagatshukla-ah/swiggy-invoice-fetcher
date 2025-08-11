@@ -6,18 +6,19 @@ import re
 from datetime import datetime, timedelta
 from PyPDF2 import PdfReader, PdfMerger
 import getpass
+from config_loader import load_settings
+cfg = load_settings()
+
+EMAIL  = cfg["EMAIL"]
+PASSWORD = cfg["PASSWORD"]
+EARNIN_OFFICE_ADDRESS = cfg["OFFICE_ADDRESS"]
+START_DATE_INPUT = cfg["START_DATE"]
+END_DATE_INPUT   = cfg["END_DATE"]
+INVOICE_DIR  = cfg["INVOICE_DIR"]
+FILTERED_DIR = cfg["FILTERED_DIR"]
+MERGED_PDF   = cfg["MERGED_PDF"]
 
 # === INTERACTIVE PROMPTS ===
-EMAIL = input("Enter your Gmail address: ")
-PASSWORD = getpass.getpass("Enter your Gmail App Password (input hidden): ")
-EARNIN_OFFICE_ADDRESS = input("Enter your office address to filter by [default: Earnin India Office]: ") or "Earnin India Office"
-
-START_DATE_INPUT = input("Enter start date (DD-MM-YY): ")
-END_DATE_INPUT = input("Enter end date (DD-MM-YY): ")
-
-INVOICE_DIR = input("Enter directory to store downloaded invoices [default: ./swiggy_invoices]: ") or "./swiggy_invoices"
-FILTERED_DIR = input("Enter directory to store filtered invoices [default: ./filtered_invoices]: ") or "./filtered_invoices"
-MERGED_PDF = input("Enter full path for merged PDF [default: ./swiggy_invoices_merged.pdf]: ") or "./swiggy_invoices_merged.pdf"
 
 IMAP_SERVER = 'imap.gmail.com'
 
@@ -64,7 +65,7 @@ try:
     mail.select("INBOX")
 
     print(f"Searching for Swiggy emails from {START_DATE_STR} to {END_DATE_STR}...")
-    search_criteria = f'(FROM "Swiggy" SINCE "{START_DATE_STR}" BEFORE "{END_DATE_STR}")'
+    search_criteria = f'(FROM "google.com" SINCE "{START_DATE_STR}" BEFORE "{END_DATE_STR}")'
     status, data = mail.search(None, search_criteria)
     email_ids = data[0].split()
 
