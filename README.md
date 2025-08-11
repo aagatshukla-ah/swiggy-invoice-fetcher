@@ -3,6 +3,18 @@
 This script fetches Swiggy invoice emails via IMAP, filters by EarnIn office address and date, downloads invoice PDFs, and merges them into a single file — all via **interactive terminal prompts**.
 
 ---
+Quick-start for *non-tech users*
+
+1. **Download & unzip** the latest release.  
+- The folder contains:
+- Swiggy Invoice Fetcher # macOS/Linux binary or .exe on Windows
+- settings.ini # <- edit me  
+
+2. **Edit `settings.ini`** in any text editor  
+- `EMAIL` – your Gmail address  
+- `APP_PASSWORD` - a 16-char Gmail App Password  
+- `START_DATE`, `END_DATE` - in `DD-MM-YY` format  
+- (optional) adjust output-folder paths
 
 ## 🛠 Requirements
 
@@ -174,3 +186,16 @@ Downloaded: 0577801071700007_dae7e1af-bd2f-41e0-808a-38468f065da9.pdf
 
 Never share or commit your app password. It is safer than using your real password, but still sensitive.
 
+
+Only maintainers need this.
+# clean previous build
+rm -rf build/ dist/ *.spec
+
+# build new binary (mac/Linux shown; add .exe on Windows)
+pyinstaller --onefile \
+            --name "Swiggy Invoice Fetcher" \
+            fetch_invoices.py
+# copy artefacts into release folder
+mkdir -p release
+cp dist/"Swiggy Invoice Fetcher" release/
+cp settings.ini release/

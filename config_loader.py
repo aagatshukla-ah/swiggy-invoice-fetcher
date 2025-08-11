@@ -31,4 +31,6 @@ def load_settings() -> dict:
         "INVOICE_DIR":    d.get("INVOICE_DIR", "./swiggy_invoices"),
         "FILTERED_DIR":   d.get("FILTERED_DIR", "./filtered_invoices"),
         "MERGED_PDF":     d.get("MERGED_PDF", "./swiggy_invoices_merged.pdf"),
+        "SENDERS":       d.get("SENDERS", "Swiggy"),
+         "ADDRESS_KEYWORDS": d.get("ADDRESS_KEYWORDS", "EarnIn India Office"),
     }
