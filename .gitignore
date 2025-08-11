@@ -1,0 +1,13 @@
+# PyInstaller
+build/
+dist/
+*.spec
+release/
+
+# Logs & caches
+*.log
+__pycache__/
+
+# macOS & Windows cruft
+.DS_Store
+Thumbs.db
