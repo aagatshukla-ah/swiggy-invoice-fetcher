@@ -7,35 +7,40 @@ from datetime import datetime, timedelta
 from PyPDF2 import PdfReader, PdfMerger
 import getpass
 
-# === INTERACTIVE PROMPTS ===
-EMAIL = input("Enter your Gmail address: ")
-PASSWORD = getpass.getpass("Enter your Gmail App Password (input hidden): ")
-EARNIN_OFFICE_ADDRESS = input("Enter your office address to filter by [default: Earnin India Office]: ") or "Earnin India Office"
+# === USER INPUT ===
+def get_user_inputs():
+    email_address = input("Enter your Gmail address: ")
+    password = getpass.getpass("Enter your Gmail App Password (input hidden): ")
+    office_address = input("Enter your office address to filter by [default: Earnin India Office]: ") or "Earnin India Office"
+    start_date_str = input("Enter start date (DD-MM-YY): ")
+    end_date_str = input("Enter end date (DD-MM-YY): ")
+    start_date = datetime.strptime(start_date_str, "%d-%m-%y")
+    end_date = datetime.strptime(end_date_str, "%d-%m-%y") + timedelta(days=1)
+    invoice_dir = input("Enter directory to store downloaded invoices [default: ./swiggy_invoices]: ") or "./swiggy_invoices"
+    filtered_dir = input("Enter directory to store filtered invoices [default: ./filtered_invoices]: ") or "./filtered_invoices"
+    merged_pdf = input("Enter full path for merged PDF [default: ./swiggy_invoices_merged.pdf]: ") or "./swiggy_invoices_merged.pdf"
+    return {
+        "email_address": email_address,
+        "password": password,
+        "office_address": office_address,
+        "start_date": start_date,
+        "end_date": end_date,
+        "invoice_dir": invoice_dir,
+        "filtered_dir": filtered_dir,
+        "merged_pdf": merged_pdf
+    }
 
-START_DATE_INPUT = input("Enter start date (DD-MM-YY): ")
-END_DATE_INPUT = input("Enter end date (DD-MM-YY): ")
+# === UTILITIES ===
+def setup_directories(invoice_dir, filtered_dir):
+    os.makedirs(invoice_dir, exist_ok=True)
+    os.makedirs(filtered_dir, exist_ok=True)
+    for directory in [invoice_dir, filtered_dir]:
+        for file in os.listdir(directory):
+            os.remove(os.path.join(directory, file))
 
-INVOICE_DIR = input("Enter directory to store downloaded invoices [default: ./swiggy_invoices]: ") or "./swiggy_invoices"
-FILTERED_DIR = input("Enter directory to store filtered invoices [default: ./filtered_invoices]: ") or "./filtered_invoices"
-MERGED_PDF = input("Enter full path for merged PDF [default: ./swiggy_invoices_merged.pdf]: ") or "./swiggy_invoices_merged.pdf"
-
-IMAP_SERVER = 'imap.gmail.com'
-
-# Convert dates
-start_dt = datetime.strptime(START_DATE_INPUT, "%d-%m-%y")
-end_dt = datetime.strptime(END_DATE_INPUT, "%d-%m-%y") + timedelta(days=1)
-START_DATE_STR = start_dt.strftime("%d-%b-%Y")
-END_DATE_STR = end_dt.strftime("%d-%b-%Y")
-
-os.makedirs(INVOICE_DIR, exist_ok=True)
-os.makedirs(FILTERED_DIR, exist_ok=True)
-
-# === HELPERS ===
 def extract_invoice_date(text):
     match = re.search(r'Date of Invoice:\s*(\d{2}-\d{2}-\d{4})', text)
-    if match:
-        return datetime.strptime(match.group(1), "%d-%m-%Y")
-    return None
+    return datetime.strptime(match.group(1), "%d-%m-%Y") if match else None
 
 def extract_total_from_pdf(pdf_path):
     total_amount = 0.0
@@ -48,77 +53,90 @@ def extract_total_from_pdf(pdf_path):
             matches = currency_pattern.findall(text)
             if matches:
                 print(f"  ➜ Page {i+1} totals found: {matches}")
-            for amt_str in matches:
-                amt_str_clean = amt_str.replace(",", "")
-                total_amount += float(amt_str_clean)
-        print(f"\n💰 Estimated total amount across all invoices: ₹{total_amount:.2f}")
+            total_amount += sum(float(amt.replace(",", "")) for amt in matches)
+        print(f"\n💰 Estimated total amount: ₹{total_amount:.2f}")
     except Exception as e:
         print(f"❌ Error reading PDF: {e}")
 
 # === MAIN LOGIC ===
-try:
-    print("Connecting to IMAP server...")
-    mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-    print("Logging in...")
-    mail.login(EMAIL, PASSWORD)
+def process_emails(config):
+    imap_server = 'imap.gmail.com'
+    mail = imaplib.IMAP4_SSL(imap_server)
+    mail.login(config["email_address"], config["password"])
     mail.select("INBOX")
 
-    print(f"Searching for Swiggy emails from {START_DATE_STR} to {END_DATE_STR}...")
-    search_criteria = f'(FROM "Swiggy" SINCE "{START_DATE_STR}" BEFORE "{END_DATE_STR}")'
-    status, data = mail.search(None, search_criteria)
-    email_ids = data[0].split()
+    start_str = config["start_date"].strftime("%d-%b-%Y")
+    end_str = config["end_date"].strftime("%d-%b-%Y")
+    print(f"Searching for Swiggy emails from {start_str} to {end_str}...")
 
+    status, data = mail.search(None, f'(FROM "Swiggy" SINCE "{start_str}" BEFORE "{end_str}")')
+    email_ids = data[0].split()
     print(f"Found {len(email_ids)} Swiggy emails.")
 
     for num in email_ids:
-        status, msg_data = mail.fetch(num, '(RFC822)')
-        raw_email = msg_data[0][1]
-        msg = message_from_bytes(raw_email)
+        _, msg_data = mail.fetch(num, '(RFC822)')
+        msg = message_from_bytes(msg_data[0][1])
 
         for part in msg.walk():
             if part.get_content_type() == 'application/pdf' and part.get_filename():
-                filename = os.path.basename(part.get_filename())
-                filepath = os.path.join(INVOICE_DIR, filename)
-                with open(filepath, 'wb') as f:
-                    f.write(part.get_payload(decode=True))
-                print(f"Downloaded: {filename}")
+                original_filename = os.path.basename(part.get_filename())
+                unique_filename = f"{num.decode()}_{original_filename}"
+                file_path = os.path.join(config["invoice_dir"], unique_filename)
 
                 try:
-                    reader = PdfReader(filepath)
+                    with open(file_path, 'wb') as f:
+                        f.write(part.get_payload(decode=True))
+                    print(f"Downloaded: {unique_filename}")
+                except Exception as e:
+                    print(f"❌ Failed to save {unique_filename}: {e}")
+                    continue
+
+                try:
+                    reader = PdfReader(file_path)
                     full_text = "".join(page.extract_text() or "" for page in reader.pages)
                     invoice_date = extract_invoice_date(full_text)
+                    filtered_path = os.path.join(config["filtered_dir"], unique_filename)
 
-                    if (
-                        invoice_date and start_dt <= invoice_date < end_dt
-                        and EARNIN_OFFICE_ADDRESS.lower() in full_text.lower()
-                    ):
-                        filtered_path = os.path.join(FILTERED_DIR, filename)
-                        os.rename(filepath, filtered_path)
-                        print(f"✔ Kept: {filename} (matched address and date: {invoice_date.strftime('%d-%b-%Y')})")
+                    if invoice_date and config["start_date"] <= invoice_date < config["end_date"] and config["office_address"].lower() in full_text.lower():
+                        if not os.path.exists(filtered_path):
+                            os.rename(file_path, filtered_path)
+                            print(f"✔ Kept: {unique_filename} (date: {invoice_date.strftime('%d-%b-%Y')})")
+                        else:
+                            print(f"⚠️ Skipping move (already exists): {unique_filename}")
+                            os.remove(file_path)
                     else:
-                        os.remove(filepath)
-                        reason = "no address match" if invoice_date and EARNIN_OFFICE_ADDRESS.lower() not in full_text.lower() else "date out of range or not found"
-                        print(f"✘ Removed: {filename} ({reason})")
+                        os.remove(file_path)
+                        reason = "address mismatch" if invoice_date and config["office_address"].lower() not in full_text.lower() else "date missing or out of range"
+                        print(f"✘ Removed: {unique_filename} ({reason})")
                 except Exception as e:
-                    print(f"Failed to process {filename}: {e}")
-                    os.remove(filepath)
-
-    merger = PdfMerger()
-    filtered_files = [f for f in os.listdir(FILTERED_DIR) if f.endswith(".pdf")]
-    for file in filtered_files:
-        merger.append(os.path.join(FILTERED_DIR, file))
-
-    if filtered_files:
-        merger.write(MERGED_PDF)
-        merger.close()
-        print(f"\n✅ Merged {len(filtered_files)} invoices into {MERGED_PDF}")
-        extract_total_from_pdf(MERGED_PDF)
-    else:
-        print("\n⚠️ No matching invoices found to merge.")
-
+                    print(f"Failed to process {unique_filename}: {e}")
+                    os.remove(file_path)
     mail.logout()
 
-except imaplib.IMAP4.error as e:
-    print(f"IMAP Error: {e}")
-except Exception as e:
-    print(f"General Error: {e}")
+# === MERGE PDFs ===
+def merge_filtered_pdfs(filtered_dir, merged_pdf):
+    pdfs = [os.path.join(filtered_dir, f) for f in os.listdir(filtered_dir) if f.endswith(".pdf")]
+    if not pdfs:
+        print("\n⚠️ No matching invoices found to merge.")
+        return
+
+    merger = PdfMerger()
+    for pdf in pdfs:
+        merger.append(pdf)
+    merger.write(merged_pdf)
+    merger.close()
+
+    print(f"\n✅ Merged {len(pdfs)} invoices into {merged_pdf}")
+    extract_total_from_pdf(merged_pdf)
+
+# === ENTRY POINT ===
+if __name__ == "__main__":
+    try:
+        config = get_user_inputs()
+        setup_directories(config["invoice_dir"], config["filtered_dir"])
+        process_emails(config)
+        merge_filtered_pdfs(config["filtered_dir"], config["merged_pdf"])
+    except imaplib.IMAP4.error as e:
+        print(f"IMAP Error: {e}")
+    except Exception as e:
+        print(f"General Error: {e}")
